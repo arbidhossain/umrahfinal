@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hajj & Umrah AI Quotation Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- jsPDF Libraries for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .summary-item-details {
+            display: block;
+            font-size: 0.8em;
+            color: #d1d5db;
+        }
+        .add-btn {
+            background-color: #22c55e;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        .add-btn:hover {
+            background-color: #16a34a;
+        }
+        .remove-btn {
+             background-color: #ef4444;
+             color: white;
+             border-radius: 50%;
+             width: 20px;
+             height: 20px;
+             font-size: 12px;
+             line-height: 20px;
+             text-align: center;
+             cursor: pointer;
+             margin-left: 8px;
+        }
+        .ai-btn {
+            background: linear-gradient(45deg, #4f46e5, #c026d3);
+        }
+        .ai-loader {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Hajj & Umrah AI Quotation Tool</h1>
+            <p class="text-gray-600 mt-2">Generate customer quotes instantly with AI-powered itineraries.</p>
+        </header>
+
+        <!-- Instructions Section -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md mb-8" role="alert">
+            <details>
+                <summary class="font-bold cursor-pointer">Click here for Setup Instructions</summary>
+                <div class="mt-4 space-y-2">
+                    <p><strong>Step 1: Prepare Your Google Sheet</strong> with your pricing data.</p>
+                    <p><strong>Step 2: Publish Your Sheet</strong> (File → Share → Publish to web → CSV).</p>
+                </div>
+            </details>
+        </div>
+
+        <!-- Data Loading Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-semibold mb-4">Load Pricing Data</h2>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="url" id="sheetUrlInput" placeholder="Paste your published Google Sheet CSV URL here" class="flex-grow p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <button id="loadDataBtn" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-md hover:bg-blue-700 transition duration-300">Load Data</button>
+            </div>
+            <div id="loader" class="hidden mt-4 mx-auto loader"></div>
+            <p id="error-message" class="text-red-500 mt-2 hidden"></p>
+        </div>
+
+        <!-- Main App Body -->
+        <div id="app-body" class="hidden grid grid-cols-1 lg:grid-cols-5 gap-8">
+            
+            <!-- Left Side: Controls -->
+            <div class="lg:col-span-3 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-6 border-b pb-4">Quote Builder</h2>
+                <form id="quoteForm" class="space-y-6">
+                    
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Customer Information</legend>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <input type="text" id="customerName" placeholder="Customer Name" class="w-full p-2 border border-gray-300 rounded-md">
+                            <input type="tel" id="customerPhone" placeholder="Phone Number" class="w-full p-2 border border-gray-300 rounded-md">
+                            <input type="text" id="customerAddress" placeholder="Address" class="md:col-span-2 w-full p-2 border border-gray-300 rounded-md">
+                            <input type="text" id="customerReference" placeholder="Reference" class="md:col-span-2 w-full p-2 border border-gray-300 rounded-md">
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Manual Entry</legend>
+                         <div class="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+                            <input type="text" id="manualDescription" placeholder="Custom Description" class="md:col-span-2 w-full p-2 border border-gray-300 rounded-md">
+                            <input type="number" id="manualSellPrice" placeholder="Sell Price" class="w-full p-2 border border-gray-300 rounded-md">
+                            <input type="number" id="manualNetPrice" placeholder="Net Price" class="w-full p-2 border border-gray-300 rounded-md">
+                            <button type="button" id="addManualEntryBtn" class="add-btn h-10">Add Item</button>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Air Ticket</legend>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div>
+                                <label for="airTicketDepartureDate" class="block text-sm font-medium text-gray-700 mb-1">Departure Date</label>
+                                <input type="date" id="airTicketDepartureDate" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                             <div>
+                                <label for="airTicketReturnDate" class="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
+                                <input type="date" id="airTicketReturnDate" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                        </div>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <select id="airTicketRoute" class="w-full p-2 border border-gray-300 rounded-md self-end"></select>
+                            <select id="airTicketType" class="w-full p-2 border border-gray-300 rounded-md self-end"></select>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                             <select id="airTicketAirline" class="sm:col-span-2 w-full p-2 border border-gray-300 rounded-md"></select>
+                             <div>
+                                <label for="airTicketPax" class="block text-sm font-medium text-gray-700 mb-1">Number of Pax</label>
+                                <input type="number" id="airTicketPax" value="1" min="1" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Visa</legend>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                            <select id="visaSelect" class="sm:col-span-2 w-full p-2 border border-gray-300 rounded-md"></select>
+                            <div>
+                                <label for="visaQuantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                                <input type="number" id="visaQuantity" value="1" min="1" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Makkah Hotel Section -->
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Makkah Hotel</legend>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div>
+                                <label for="makkahCheckin" class="block text-sm font-medium text-gray-700 mb-1">Check-in</label>
+                                <input type="date" id="makkahCheckin" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                            <div>
+                                <label for="makkahCheckout" class="block text-sm font-medium text-gray-700 mb-1">Check-out</label>
+                                <input type="date" id="makkahCheckout" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                            <select id="makkahRoomType" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                            <select id="makkahHotelCategory" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                            <select id="makkahHotelName" class="sm:col-span-2 w-full p-2 border border-gray-300 rounded-md"></select>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="makkahNumRooms" class="block text-sm font-medium text-gray-700 mb-1">Rooms</label>
+                                    <input type="number" id="makkahNumRooms" value="1" min="1" class="w-full p-2 border border-gray-300 rounded-md">
+                                </div>
+                                 <div>
+                                    <label for="makkahNights" class="block text-sm font-medium text-gray-700 mb-1">Nights</label>
+                                    <input type="text" id="makkahNights" readonly class="w-full p-2 border bg-gray-100 border-gray-300 rounded-md">
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Medina Hotel Section -->
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Medina Hotel</legend>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div>
+                                <label for="medinaCheckin" class="block text-sm font-medium text-gray-700 mb-1">Check-in</label>
+                                <input type="date" id="medinaCheckin" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                            <div>
+                                <label for="medinaCheckout" class="block text-sm font-medium text-gray-700 mb-1">Check-out</label>
+                                <input type="date" id="medinaCheckout" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                            <select id="medinaRoomType" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                            <select id="medinaHotelCategory" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                            <select id="medinaHotelName" class="sm:col-span-2 w-full p-2 border border-gray-300 rounded-md"></select>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="medinaNumRooms" class="block text-sm font-medium text-gray-700 mb-1">Rooms</label>
+                                    <input type="number" id="medinaNumRooms" value="1" min="1" class="w-full p-2 border border-gray-300 rounded-md">
+                                </div>
+                                <div>
+                                    <label for="medinaNights" class="block text-sm font-medium text-gray-700 mb-1">Nights</label>
+                                    <input type="text" id="medinaNights" readonly class="w-full p-2 border bg-gray-100 border-gray-300 rounded-md">
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Transport</legend>
+                        <div class="space-y-4 mt-2">
+                            <div>
+                                <label for="paxInput" class="block text-sm font-medium text-gray-700 mb-1">Number of People (Pax)</label>
+                                <input type="number" id="paxInput" value="1" min="1" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                            <div>
+                                <label for="transportSelect" class="block text-sm font-medium text-gray-700 mb-1">Vehicle</label>
+                                <select id="transportSelect" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Food</legend>
+                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                            <select id="foodSelect" class="sm:col-span-2 w-full p-2 border border-gray-300 rounded-md"></select>
+                            <div>
+                                <label for="foodPax" class="block text-sm font-medium text-gray-700 mb-1">Number of Pax</label>
+                                <input type="number" id="foodPax" value="1" min="1" class="w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                        </div>
+                    </fieldset>
+                    
+                    <fieldset class="border border-gray-200 p-4 rounded-md">
+                        <legend class="text-lg font-medium px-2">Other Services</legend>
+                        <select id="otherSelect" class="w-full p-2 border border-gray-300 rounded-md mt-2"></select>
+                    </fieldset>
+                </form>
+            </div>
+
+            <!-- Right Side: Summary -->
+            <div class="lg:col-span-2 bg-gray-800 text-white p-6 rounded-lg shadow-lg flex flex-col">
+                <h2 class="text-2xl font-semibold mb-6 border-b border-gray-600 pb-4">Quotation Summary</h2>
+                
+                <div id="customer-info-summary" class="mb-6 p-4 bg-gray-700 rounded-md"></div>
+
+                <div id="quoteSummary" class="space-y-4 mb-6 min-h-[150px] flex-grow">
+                    <p class="text-gray-400">Select items to build the quote.</p>
+                </div>
+
+                <!-- AI Generation Section -->
+                <div id="ai-section" class="mt-4 space-y-4">
+                    <button id="generateAiContentBtn" class="w-full ai-btn text-white font-bold py-3 px-4 rounded-md hover:opacity-90 transition duration-300 flex items-center justify-center gap-2">
+                        <span id="ai-btn-text">✨ Generate Itinerary & Message</span>
+                        <div id="ai-loader" class="hidden ai-loader"></div>
+                    </button>
+                    <div id="ai-output" class="hidden space-y-4">
+                        <div>
+                            <label for="aiMessage" class="block text-sm font-medium text-gray-300 mb-1">Generated Message</label>
+                            <textarea id="aiMessage" rows="4" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white"></textarea>
+                        </div>
+                        <div>
+                            <label for="aiItinerary" class="block text-sm font-medium text-gray-300 mb-1">Generated Itinerary</label>
+                            <textarea id="aiItinerary" rows="8" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white"></textarea>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="includeAiInPdf" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600">
+                            <label for="includeAiInPdf" class="ml-2 block text-sm text-gray-300">Include in Customer PDF</label>
+                        </div>
+                    </div>
+                     <p id="ai-error-message" class="text-red-400 text-sm hidden"></p>
+                </div>
+
+
+                <div class="border-t-2 border-green-400 pt-4 mt-6">
+                    <div class="flex justify-between items-center text-2xl font-bold">
+                        <span>Total Price:</span>
+                        <span id="totalPrice">0.00 SAR</span>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex flex-col sm:flex-row gap-4">
+                     <button id="downloadCustomerCopy" class="flex-1 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Download Customer Copy</button>
+                     <button id="downloadAccountsCopy" class="flex-1 bg-green-600 text-white font-bold py-3 px-4 rounded-md hover:bg-green-700 transition duration-300">Download Accounts Copy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- DOM Element References ---
+        const sheetUrlInput = document.getElementById('sheetUrlInput');
+        const loadDataBtn = document.getElementById('loadDataBtn');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('error-message');
+        const appBody = document.getElementById('app-body');
+        const quoteForm = document.getElementById('quoteForm');
+        const paxInput = document.getElementById('paxInput');
+        const visaQuantityInput = document.getElementById('visaQuantity');
+        const foodPaxInput = document.getElementById('foodPax');
+        const airTicketPaxInput = document.getElementById('airTicketPax');
+
+        const customerNameInput = document.getElementById('customerName');
+        const customerPhoneInput = document.getElementById('customerPhone');
+        const customerAddressInput = document.getElementById('customerAddress');
+        const customerReferenceInput = document.getElementById('customerReference');
+        
+        const manualDescInput = document.getElementById('manualDescription');
+        const manualSellInput = document.getElementById('manualSellPrice');
+        const manualNetInput = document.getElementById('manualNetPrice');
+        const addManualBtn = document.getElementById('addManualEntryBtn');
+
+        const selectors = {
+            visa: document.getElementById('visaSelect'),
+            transport: document.getElementById('transportSelect'),
+            food: document.getElementById('foodSelect'),
+            other: document.getElementById('otherSelect'),
+            airticket: document.getElementById('airTicketAirline'),
+        };
+
+        const airTicketFilters = {
+            departureDate: document.getElementById('airTicketDepartureDate'),
+            returnDate: document.getElementById('airTicketReturnDate'),
+            route: document.getElementById('airTicketRoute'),
+            type: document.getElementById('airTicketType'),
+        };
+
+        const hotelSelectors = {
+            makkah: {
+                checkin: document.getElementById('makkahCheckin'),
+                checkout: document.getElementById('makkahCheckout'),
+                nights: document.getElementById('makkahNights'),
+                roomType: document.getElementById('makkahRoomType'),
+                category: document.getElementById('makkahHotelCategory'),
+                name: document.getElementById('makkahHotelName'),
+                rooms: document.getElementById('makkahNumRooms'),
+            },
+            medina: {
+                checkin: document.getElementById('medinaCheckin'),
+                checkout: document.getElementById('medinaCheckout'),
+                nights: document.getElementById('medinaNights'),
+                roomType: document.getElementById('medinaRoomType'),
+                category: document.getElementById('medinaHotelCategory'),
+                name: document.getElementById('medinaHotelName'),
+                rooms: document.getElementById('medinaNumRooms'),
+            }
+        };
+
+        const quoteSummary = document.getElementById('quoteSummary');
+        const customerInfoSummary = document.getElementById('customer-info-summary');
+        const totalPriceEl = document.getElementById('totalPrice');
+        const downloadCustomerCopyBtn = document.getElementById('downloadCustomerCopy');
+        const downloadAccountsCopyBtn = document.getElementById('downloadAccountsCopy');
+
+        // AI Feature Elements
+        const generateAiContentBtn = document.getElementById('generateAiContentBtn');
+        const aiBtnText = document.getElementById('ai-btn-text');
+        const aiLoader = document.getElementById('ai-loader');
+        const aiOutputContainer = document.getElementById('ai-output');
+        const aiMessageTextarea = document.getElementById('aiMessage');
+        const aiItineraryTextarea = document.getElementById('aiItinerary');
+        const includeAiInPdfCheckbox = document.getElementById('includeAiInPdf');
+        const aiErrorMessage = document.getElementById('ai-error-message');
+
+
+        // --- Application State ---
+        let appData = {
+            visa: [],
+            transport: [],
+            makkahhotel: [],
+            medinahotel: [],
+            food: [],
+            other: [],
+            airticket: [],
+        };
+        let quoteData = [];
+        let manualEntries = [];
+        let activeCurrency = 'SAR';
+
+        // --- Event Listeners ---
+        loadDataBtn.addEventListener('click', handleLoadData);
+        quoteForm.addEventListener('change', updateQuoteSummary);
+        paxInput.addEventListener('input', () => {
+            updateTransportOptions();
+            updateQuoteSummary();
+        });
+        
+        addManualBtn.addEventListener('click', handleAddManualEntry);
+        quoteSummary.addEventListener('click', handleRemoveManualEntry);
+        generateAiContentBtn.addEventListener('click', generateAiContent);
+
+        downloadCustomerCopyBtn.addEventListener('click', () => generatePdf(false));
+        downloadAccountsCopyBtn.addEventListener('click', () => generatePdf(true));
+
+
+        Object.values(hotelSelectors).forEach(hotel => {
+            hotel.checkin.addEventListener('change', () => { hotel.checkout.min = hotel.checkin.value; updateHotelNameOptions(hotel); });
+            hotel.checkout.addEventListener('change', () => updateHotelNameOptions(hotel));
+            hotel.roomType.addEventListener('change', () => updateHotelNameOptions(hotel));
+            hotel.category.addEventListener('change', () => updateHotelNameOptions(hotel));
+        });
+
+        Object.values(airTicketFilters).forEach(filter => {
+            filter.addEventListener('change', updateAirlineOptions);
+        });
+         airTicketFilters.departureDate.addEventListener('change', () => {
+            airTicketFilters.returnDate.min = airTicketFilters.departureDate.value;
+        });
+
+
+        // --- Functions ---
+        
+        function setMinDates() {
+            const today = new Date().toISOString().split('T')[0];
+            airTicketFilters.departureDate.min = today;
+            airTicketFilters.returnDate.min = today;
+            Object.values(hotelSelectors).forEach(hotel => {
+                hotel.checkin.min = today;
+                hotel.checkout.min = today;
+            });
+        }
+
+        async function handleLoadData() {
+            const url = sheetUrlInput.value.trim();
+            if (!url) { showError("Please enter a valid Google Sheet URL."); return; }
+            loader.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            appBody.classList.add('hidden');
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Network response was not ok. Status: ${response.status}`);
+                const csvText = await response.text();
+                parseCSV(csvText);
+                populateAllDropdowns();
+                appBody.classList.remove('hidden');
+                setMinDates();
+                updateQuoteSummary();
+            } catch (error) {
+                console.error("Failed to load or parse data:", error);
+                showError("Failed to load data. " + error.message);
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function parseCSV(text) {
+            Object.keys(appData).forEach(key => appData[key] = []);
+            if (text.charCodeAt(0) === 0xFEFF) text = text.substring(1);
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length < 2) throw new Error("CSV has no data rows.");
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
+            const requiredHeaders = ['category', 'price', 'netprice'];
+            const missingHeaders = requiredHeaders.filter(rh => !headers.includes(rh));
+            if (missingHeaders.length > 0) {
+                 throw new Error(`Your Google Sheet is missing or has misspelled headers: ${missingHeaders.join(', ')}.`);
+            }
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] ? values[index].trim() : '';
+                });
+                const category = row.category?.toLowerCase();
+                if (appData.hasOwnProperty(category)) {
+                    appData[category].push(row);
+                }
+            }
+        }
+
+        function populateAllDropdowns() {
+            Object.entries(selectors).forEach(([key, selectElement]) => {
+                if (key === 'transport' || key === 'airticket') return; 
+                selectElement.innerHTML = '<option value="">-- None --</option>';
+                appData[key].forEach((item, index) => {
+                    const option = document.createElement('option');
+                    option.value = `${key}-${index}`;
+                    option.textContent = `${item.supplier || ''} - ${item.itemname} (Sell: ${item.price} ${item.currency})`.replace(/^ - /,'');
+                    selectElement.appendChild(option);
+                });
+            });
+            updateTransportOptions();
+            populateHotelFilters(hotelSelectors.makkah, appData.makkahhotel);
+            populateHotelFilters(hotelSelectors.medina, appData.medinahotel);
+            populateAirTicketFilters();
+        }
+
+        function populateAirTicketFilters() {
+            const routes = [...new Set(appData.airticket.map(t => t.route))].filter(Boolean);
+            const types = [...new Set(appData.airticket.map(t => t.type))].filter(Boolean);
+
+            airTicketFilters.route.innerHTML = '<option value="">-- Select Route --</option>';
+            routes.forEach(route => airTicketFilters.route.innerHTML += `<option value="${route}">${route}</option>`);
+            
+            airTicketFilters.type.innerHTML = '<option value="">-- Select Type --</option>';
+            types.forEach(type => airTicketFilters.type.innerHTML += `<option value="${type}">${type}</option>`);
+
+            updateAirlineOptions();
+        }
+
+        function updateAirlineOptions() {
+            const departureDate = airTicketFilters.departureDate.value ? new Date(airTicketFilters.departureDate.value) : null;
+            const returnDate = airTicketFilters.returnDate.value ? new Date(airTicketFilters.returnDate.value) : null;
+            const selectedRoute = airTicketFilters.route.value;
+            const selectedType = airTicketFilters.type.value;
+            
+            const filteredTickets = appData.airticket.filter(ticket => {
+                const isRouteMatch = !selectedRoute || ticket.route === selectedRoute;
+                const isTypeMatch = !selectedType || ticket.type === selectedType;
+                let isDateValid = true;
+                if(departureDate && returnDate && ticket.validfrom && ticket.validto) {
+                    const validFrom = new Date(ticket.validfrom);
+                    const validTo = new Date(ticket.validto);
+                    isDateValid = departureDate >= validFrom && returnDate <= validTo;
+                }
+                return isRouteMatch && isTypeMatch && isDateValid;
+            });
+
+            const airlineSelect = selectors.airticket;
+            airlineSelect.innerHTML = '<option value="">-- Select Airline --</option>';
+            filteredTickets.forEach(ticket => {
+                const originalIndex = appData.airticket.indexOf(ticket);
+                airlineSelect.innerHTML += `<option value="airticket-${originalIndex}">${ticket.supplier} - ${ticket.itemname} (${ticket.price} ${ticket.currency})</option>`;
+            });
+            updateQuoteSummary();
+        }
+
+        function updateTransportOptions() {
+            const numPax = parseInt(paxInput.value, 10) || 1;
+            const transportSelect = selectors.transport;
+            const currentSelection = transportSelect.value;
+            transportSelect.innerHTML = '<option value="">-- None --</option>';
+            appData.transport.forEach((item, index) => {
+                if (isPaxInRange(numPax, item.paxrange)) {
+                    const option = document.createElement('option');
+                    option.value = `transport-${index}`;
+                    option.textContent = `${item.supplier} - ${item.itemname} (Sell: ${item.price} ${item.currency})`;
+                    transportSelect.appendChild(option);
+                }
+            });
+            if (transportSelect.querySelector(`option[value="${currentSelection}"]`)) {
+                transportSelect.value = currentSelection;
+            }
+        }
+
+        function populateHotelFilters(hotelUI, hotelData) {
+            const roomTypes = [...new Set(hotelData.map(h => h.roomtype))].filter(Boolean);
+            const categories = [...new Set(hotelData.map(h => h.hotelcategory))].filter(Boolean);
+            hotelUI.roomType.innerHTML = '<option value="">-- Select Room Type --</option>';
+            roomTypes.forEach(type => hotelUI.roomType.innerHTML += `<option value="${type}">${type}</option>`);
+            hotelUI.category.innerHTML = '<option value="">-- Select Category --</option>';
+            categories.forEach(cat => hotelUI.category.innerHTML += `<option value="${cat}">${cat}</option>`);
+            updateHotelNameOptions(hotelUI);
+        }
+        
+        function updateHotelNameOptions(hotelUI) {
+            const selectedRoomType = hotelUI.roomType.value;
+            const selectedCategory = hotelUI.category.value;
+            const checkinDate = hotelUI.checkin.value ? new Date(hotelUI.checkin.value) : null;
+            const checkoutDate = hotelUI.checkout.value ? new Date(hotelUI.checkout.value) : null;
+            const hotelKey = hotelUI === hotelSelectors.makkah ? 'makkahhotel' : 'medinahotel';
+            const filteredHotels = appData[hotelKey].filter(hotel => {
+                const isRoomTypeMatch = !selectedRoomType || hotel.roomtype === selectedRoomType;
+                const isCategoryMatch = !selectedCategory || hotel.hotelcategory === selectedCategory;
+                let isDateValid = true;
+                if (checkinDate && checkoutDate && hotel.validfrom && hotel.validto) {
+                    const validFrom = new Date(hotel.validfrom);
+                    const validTo = new Date(hotel.validto);
+                    isDateValid = checkinDate >= validFrom && checkoutDate <= validTo;
+                }
+                return isRoomTypeMatch && isCategoryMatch && isDateValid;
+            });
+            hotelUI.name.innerHTML = '<option value="">-- Select Hotel --</option>';
+            filteredHotels.forEach(hotel => {
+                const originalIndex = appData[hotelKey].indexOf(hotel);
+                hotelUI.name.innerHTML += `<option value="${hotelKey}-${originalIndex}">${hotel.supplier} - ${hotel.hotelname} (Sell: ${hotel.price} ${hotel.currency})</option>`;
+            });
+            updateQuoteSummary();
+        }
+        
+        function isPaxInRange(pax, rangeStr) {
+            if (!rangeStr || rangeStr.toUpperCase() === 'N/A') return true;
+            const parts = rangeStr.split('-').map(Number);
+            if (parts.length === 1) return pax === parts[0];
+            if (parts.length === 2) return pax >= parts[0] && pax <= parts[1];
+            return false;
+        }
+        
+        function calculateNights(checkinStr, checkoutStr) {
+            if (!checkinStr || !checkoutStr) return 0;
+            const checkin = new Date(checkinStr);
+            const checkout = new Date(checkoutStr);
+            if (checkout <= checkin) return 0;
+            const diffTime = Math.abs(checkout - checkin);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        }
+
+        function handleAddManualEntry() {
+            const description = manualDescInput.value.trim();
+            const sellPrice = parseFloat(manualSellInput.value);
+            const netPrice = parseFloat(manualNetInput.value);
+
+            if (!description || isNaN(sellPrice) || isNaN(netPrice)) {
+                alert("Please fill in the description, sell price, and net price for the manual entry.");
+                return;
+            }
+
+            manualEntries.push({
+                description: description,
+                sell: sellPrice,
+                net: netPrice,
+                profit: sellPrice - netPrice,
+                currency: activeCurrency, // Use the currently active currency
+                isManual: true
+            });
+
+            manualDescInput.value = '';
+            manualSellInput.value = '';
+            manualNetInput.value = '';
+
+            updateQuoteSummary();
+        }
+
+        function handleRemoveManualEntry(event) {
+            if (event.target.classList.contains('remove-btn')) {
+                const index = parseInt(event.target.dataset.manualIndex, 10);
+                manualEntries.splice(index, 1);
+                updateQuoteSummary();
+            }
+        }
+
+
+        function updateQuoteSummary() {
+            customerInfoSummary.innerHTML = `<div class="text-sm"><p><strong>To:</strong> ${customerNameInput.value||'N/A'}</p><p><strong>Phone:</strong> ${customerPhoneInput.value||'N/A'}</p><p><strong>Address:</strong> ${customerAddressInput.value||'N/A'}</p><p><strong>Reference:</strong> ${customerReferenceInput.value||'N/A'}</p></div>`;
+            quoteSummary.innerHTML = '';
+            let totalSellingPrice = 0;
+            quoteData = []; // Reset quote data for PDF generation
+            const numPax = parseInt(paxInput.value, 10) || 1;
+            let hasItems = false;
+
+            const processItem = (item, quantity, isPerPax, nights = 0, itemKey = '') => {
+                 if (item.paxrange && !isPaxInRange(numPax, item.paxrange)) {
+                    return;
+                }
+                
+                hasItems = true;
+                activeCurrency = item.currency || activeCurrency;
+                let sellingPrice = parseFloat(item.price) || 0;
+                let netPrice = parseFloat(item.netprice) || 0;
+                let lineSellingTotal = 0;
+                let lineNetTotal = 0;
+                
+                let itemName = item.hotelname || item.itemname || item.supplier;
+                let displayDetails = '';
+                let pdfDescription = '';
+
+                let effectiveQuantity = isPerPax ? numPax : quantity;
+
+                if (itemKey === 'airticket') {
+                    const departureDate = airTicketFilters.departureDate.value || 'N/A';
+                    const returnDate = airTicketFilters.returnDate.value || 'N/A';
+                    itemName = `${item.supplier} - ${item.route}`;
+                    displayDetails = `<span class="summary-item-details">Dep: ${departureDate}, Ret: ${returnDate} x ${effectiveQuantity} pax</span>`;
+                    pdfDescription = `Dep: ${departureDate}, Ret: ${returnDate} x ${effectiveQuantity} pax`;
+                    lineSellingTotal = sellingPrice * effectiveQuantity;
+                    lineNetTotal = netPrice * effectiveQuantity;
+                } else if (nights > 0) { // Hotel calculation
+                    lineSellingTotal = sellingPrice * quantity * nights;
+                    lineNetTotal = netPrice * quantity * nights;
+                    itemName = item.hotelname;
+                    displayDetails = `x ${quantity} room(s) x ${nights} night(s)`;
+                     pdfDescription = displayDetails;
+                } else { // Other items
+                    lineSellingTotal = sellingPrice * effectiveQuantity;
+                    lineNetTotal = netPrice * effectiveQuantity;
+                    itemName = item.itemname;
+                    if(effectiveQuantity > 1) {
+                         displayDetails = `x ${effectiveQuantity}`;
+                    }
+                    pdfDescription = displayDetails;
+                }
+
+                totalSellingPrice += lineSellingTotal;
+                
+                quoteData.push({
+                    description: `${itemName} ${pdfDescription}`,
+                    sell: lineSellingTotal.toFixed(2),
+                    net: lineNetTotal.toFixed(2),
+                    profit: (lineSellingTotal - lineNetTotal).toFixed(2),
+                    currency: item.currency
+                });
+            };
+
+            // Process standard items from dropdowns
+            Object.entries(selectors).forEach(([key, selectElement]) => {
+                if (!selectElement.value) return;
+                const [itemKey, index] = selectElement.value.split('-');
+                const item = appData[itemKey][index];
+                let isPerPax = item.pricetype?.toLowerCase() === 'perpax';
+                let quantity = 1;
+
+                if (itemKey === 'visa') {
+                    quantity = parseInt(visaQuantityInput.value, 10) || 1;
+                    isPerPax = false; 
+                } else if (itemKey === 'food') {
+                    quantity = parseInt(foodPaxInput.value, 10) || 1;
+                    isPerPax = false;
+                } else if (itemKey === 'airticket') {
+                    quantity = parseInt(airTicketPaxInput.value, 10) || 1;
+                    isPerPax = false; 
+                }
+                processItem(item, quantity, isPerPax, 0, itemKey);
+            });
+
+            // Process hotels
+            Object.values(hotelSelectors).forEach(hotelUI => {
+                const nights = calculateNights(hotelUI.checkin.value, hotelUI.checkout.value);
+                hotelUI.nights.value = nights;
+                 if (!hotelUI.name.value || nights === 0) return;
+                 const [key, index] = hotelUI.name.value.split('-');
+                 const item = appData[key][index];
+                 const numRooms = parseInt(hotelUI.rooms.value, 10) || 1;
+                 processItem(item, numRooms, false, nights, key);
+            });
+
+            // Process manual entries and add them to quoteData
+            manualEntries.forEach(entry => {
+                hasItems = true;
+                totalSellingPrice += entry.sell;
+                quoteData.push(entry);
+            });
+            
+            // Now render the entire quoteSummary from the combined quoteData
+            if (quoteData.length > 0) {
+                quoteSummary.innerHTML = ''; // Clear previous summary
+                quoteData.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'summary-item';
+                    
+                    let removeButtonHTML = '';
+                    if (item.isManual) {
+                        const manualIndex = manualEntries.findIndex(me => me === item);
+                        removeButtonHTML = `<button type="button" class="remove-btn" data-manual-index="${manualIndex}">×</button>`;
+                    }
+
+                    div.innerHTML = `
+                        <div class="flex-grow">
+                            <span>${item.description}</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="font-semibold">${parseFloat(item.sell).toFixed(2)} ${item.currency}</span>
+                            ${removeButtonHTML}
+                        </div>
+                    `;
+                    quoteSummary.appendChild(div);
+                });
+            } else {
+                 quoteSummary.innerHTML = '<p class="text-gray-400">Select items or use manual entry to build the quote.</p>';
+            }
+
+            totalPriceEl.textContent = `${totalSellingPrice.toFixed(2)} ${activeCurrency}`;
+        }
+        
+        // --- Gemini AI Function ---
+        async function generateAiContent() {
+            if (quoteData.length === 0) {
+                showAiError("Please add items to the quote before generating content.");
+                return;
+            }
+
+            // Show loader, hide previous results
+            aiBtnText.textContent = 'Generating...';
+            aiLoader.classList.remove('hidden');
+            generateAiContentBtn.disabled = true;
+            aiOutputContainer.classList.add('hidden');
+            aiErrorMessage.classList.add('hidden');
+
+            const packageDetails = quoteData.map(item => item.description).join('\n- ');
+
+            const prompt = `
+                You are an expert travel agent specializing in Hajj and Umrah packages.
+                A quote has been prepared for a customer. Based on the following package details, generate a suggested day-by-day travel itinerary and a friendly cover message to send to the customer with the quote.
+
+                Package Details:
+                - Customer Name: ${customerNameInput.value || 'Valued Customer'}
+                - Items:
+                - ${packageDetails}
+
+                Please provide the output in a JSON format with two keys: "itinerary" and "customerMessage".
+
+                - The "itinerary" should be a string containing a day-by-day breakdown. Be creative and include suggestions for prayers, ziyarat (visiting historical sites), and rest. Assume standard religious practices. Make it sound appealing and well-planned.
+                - The "customerMessage" should be a friendly, professional, and concise message to accompany the quote. It should greet the customer by name and briefly mention the attached quotation for their planned spiritual journey.
+            `;
+
+            try {
+                const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { 
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "itinerary": { "type": "STRING" },
+                                "customerMessage": { "type": "STRING" }
+                            },
+                        }
+                    }
+                };
+                const apiKey = ""; // API key is handled by the environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                    const jsonText = result.candidates[0].content.parts[0].text;
+                    const parsedJson = JSON.parse(jsonText);
+                    aiMessageTextarea.value = parsedJson.customerMessage;
+                    aiItineraryTextarea.value = parsedJson.itinerary;
+                    aiOutputContainer.classList.remove('hidden');
+                } else {
+                    throw new Error("Received an unexpected response structure from the API.");
+                }
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                showAiError("Sorry, there was an error generating the content. Please try again.");
+            } finally {
+                // Hide loader
+                aiBtnText.textContent = '✨ Generate Itinerary & Message';
+                aiLoader.classList.add('hidden');
+                generateAiContentBtn.disabled = false;
+            }
+        }
+
+        function showAiError(message) {
+            aiErrorMessage.textContent = message;
+            aiErrorMessage.classList.remove('hidden');
+        }
+
+        function generatePdf(isAccountsCopy) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // --- Company Logo and Details ---
+            // Base64 encoded logo from the provided JPEG
+            const logoBase64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAFdAmkDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD+/iiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACii-';
+            
+            doc.addImage(logoBase64, 'JPEG', 14, 15, 45, 25);
+
+            // --- Company Details ---
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text("Versatile Travels & Tours Ltd.", 200, 20, null, null, "right");
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(10);
+            doc.text("107, Motijheel, Khan Mansion (Ground Floor), Dhaka-1000", 200, 26, null, null, "right");
+            doc.text("Phone: 01713-194844 / 48", 200, 32, null, null, "right");
+            
+            doc.setFontSize(12);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 200, 42, null, null, "right");
+            doc.text(`Quote ID: Q-${Date.now()}`, 200, 48, null, null, "right");
+
+            // --- Customer Info ---
+            doc.setFontSize(14);
+            doc.text("Bill To:", 14, 60);
+            doc.setFontSize(12);
+            doc.text(customerNameInput.value || "N/A", 14, 66);
+            doc.text(customerAddressInput.value || "N/A", 14, 72);
+            doc.text(customerPhoneInput.value || "N/A", 14, 78);
+            doc.text(`Reference: ${customerReferenceInput.value || 'N/A'}`, 14, 84);
+            
+            let startY = 95;
+
+            // --- AI Generated Message (Optional) ---
+            if (!isAccountsCopy && includeAiInPdfCheckbox.checked && aiMessageTextarea.value) {
+                doc.setFontSize(11);
+                const messageLines = doc.splitTextToSize(aiMessageTextarea.value, 180);
+                doc.text(messageLines, 14, startY);
+                startY += (messageLines.length * 5) + 10; // Adjust spacing
+            }
+
+
+            // --- Table ---
+            const head = isAccountsCopy 
+                ? [['Description', 'Sell Price', 'Net Price', 'Profit']] 
+                : [['Description', 'Total Price']];
+            
+            const body = quoteData.map(item => {
+                const sellPrice = parseFloat(item.sell).toFixed(2);
+                const netPrice = parseFloat(item.net).toFixed(2);
+                const profit = (item.isManual ? item.profit : (sellPrice - netPrice)).toFixed(2);
+
+                const row = [item.description, `${sellPrice} ${item.currency}`];
+                if (isAccountsCopy) {
+                    row.push(`${netPrice} ${item.currency}`);
+                    row.push(`${profit} ${item.currency}`);
+                }
+                return row;
+            });
+
+            doc.autoTable({
+                startY: startY,
+                head: head,
+                body: body,
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185] },
+                columnStyles: isAccountsCopy 
+                    ? { 0: { cellWidth: 85 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
+                    : { 0: { cellWidth: 145 }, 1: { halign: 'right' } },
+            });
+
+            // --- Totals ---
+            let finalY = doc.autoTable.previous.finalY + 10;
+            
+            const totalSell = quoteData.reduce((sum, item) => sum + parseFloat(item.sell), 0);
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const rightMargin = 15;
+            const valueX = pageWidth - rightMargin;
+            const labelX = valueX - 40;
+            
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text("Total:", labelX, finalY, {align: 'right'});
+            doc.text(`${totalSell.toFixed(2)} ${activeCurrency}`, valueX, finalY, { align: 'right' });
+            doc.setFont(undefined, 'normal');
+
+            if (isAccountsCopy) {
+                finalY += 7;
+                const totalNet = quoteData.reduce((sum, item) => sum + parseFloat(item.net), 0);
+                const totalProfit = totalSell - totalNet;
+                doc.setFontSize(12);
+                doc.text("Total Net Cost:", labelX, finalY, {align: 'right'});
+                doc.text(`${totalNet.toFixed(2)} ${activeCurrency}`, valueX, finalY, { align: 'right' });
+                finalY += 7;
+                doc.text("Total Profit:", labelX, finalY, {align: 'right'});
+                doc.text(`${totalProfit.toFixed(2)} ${activeCurrency}`, valueX, finalY, { align: 'right' });
+            }
+
+            // --- AI Generated Itinerary (Optional) ---
+            if (!isAccountsCopy && includeAiInPdfCheckbox.checked && aiItineraryTextarea.value) {
+                doc.addPage();
+                doc.setFontSize(16);
+                doc.text("Suggested Itinerary", 105, 20, null, null, "center");
+                doc.setFontSize(11);
+                const itineraryLines = doc.splitTextToSize(aiItineraryTextarea.value, 180);
+                doc.text(itineraryLines, 14, 35);
+            }
+            
+            // --- Footer ---
+            const pageCount = doc.internal.getNumberOfPages();
+            for(let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(10);
+                doc.text('Thank you for your business!', 105, 280, null, null, 'center');
+                doc.text('Location: https://goo.gl/maps/BtTHT22KbE8wHeGeA', 105, 285, null, null, 'center');
+            }
+
+            // --- Save ---
+            const fileName = isAccountsCopy ? `Accounts_Quote_${customerNameInput.value || 'NoName'}.pdf` : `Customer_Quote_${customerNameInput.value || 'NoName'}.pdf`;
+            doc.save(fileName);
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+        
+        // Initialize min dates on page load
+        setMinDates();
+
+    </script>
+</body>
+</html>
